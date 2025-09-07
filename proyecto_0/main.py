@@ -3,11 +3,11 @@ import mediapipe as mp
 
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
-
+cap = None
 try:
     with mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5) as hands:
 
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) 
 
         print("Presiona Q para salir")
 
@@ -42,13 +42,9 @@ try:
                         if lm_list[4][0] < lm_list[3][0]:
                             counts[label] += 1
 
-                    # mp_drawing.draw_landmarks(
-                    #    frame,
-                    #    hand_landmarks,
-                    #    mp_hands.HAND_CONNECTIONS,
-                    #    mp_drawing.DrawingSpec(color=(0, 255, 255), thickness=2, circle_radius=3),
-                    #    mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=3),
-                    # )
+                    mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS,
+                         mp_drawing.DrawingSpec(color=(0, 255, 255), thickness=2, circle_radius=3),
+                         mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=3))
 
             cv2.putText(frame, f"Izq: {counts['Left']}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
             cv2.putText(frame, f"Der: {counts['Right']}", (400, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
@@ -58,5 +54,6 @@ try:
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 finally:
-    cap.release()
+    if cap is not None:
+        cap.release()
     cv2.destroyAllWindows()
