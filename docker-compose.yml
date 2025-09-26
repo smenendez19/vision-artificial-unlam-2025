@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  vision-app:
+    build: .
+    container_name: vision_app
+    volumes:
+      - .:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    working_dir: /app/${PROJECT}   # cambia el directorio según el proyecto
+    devices:
+      - /dev/video0:/dev/video0
+    environment:
+      - DISPLAY=${DISPLAY}
+    network_mode: "host"
+    stdin_open: true
+    tty: true
+    command: python main.py
+
