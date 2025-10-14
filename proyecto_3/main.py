@@ -1,14 +1,16 @@
+from collections import deque
+
 import cv2
 import numpy as np
-from collections import deque
 
 # =========================================
 # Parámetros
 # =========================================
 DEST_SIZE = 500  # tamaño del cuadrado frontal (px)
-GRID_N = 3       # grilla NxN en la visualización
+GRID_N = 3  # grilla NxN en la visualización
 WINDOW_NAME_VIEW = "Vista"
 WINDOW_NAME_WARP = "Frontal (warp)"
+
 
 # =========================================
 # Utilidades geométricas
@@ -28,21 +30,18 @@ def order_corners(pts):
     bl = pts[np.argmax(diff)]
     return np.array([tl, tr, br, bl], dtype=np.float32)
 
+
 def compute_homography(src_pts, size=DEST_SIZE):
     """
     src_pts: cuatro puntos de la imagen en perspectiva (TL,TR,BR,BL)
     size: tamaño del cuadrado frontal de destino (size x size)
     """
-    dst_pts = np.array([
-        [0, 0],
-        [size - 1, 0],
-        [size - 1, size - 1],
-        [0, size - 1]
-    ], dtype=np.float32)
+    dst_pts = np.array([[0, 0], [size - 1, 0], [size - 1, size - 1], [0, size - 1]], dtype=np.float32)
     H, _ = cv2.findHomography(src_pts, dst_pts, method=cv2.RANSAC)
     return H
 
-def draw_perspective_grid(frame, H, n=GRID_N, size=DEST_SIZE, color=(0,255,0), thickness=1):
+
+def draw_perspective_grid(frame, H, n=GRID_N, size=DEST_SIZE, color=(0, 255, 0), thickness=1):
     """
     Dibuja en 'frame' una grilla cuadrada NxN en perspectiva,
     mapeando líneas del plano frontal (destino) hacia la imagen original (fuente).
@@ -79,11 +78,13 @@ def draw_perspective_grid(frame, H, n=GRID_N, size=DEST_SIZE, color=(0,255,0), t
 
     return frame
 
-def put_status_text(img, lines, org=(10,30)):
+
+def put_status_text(img, lines, org=(10, 30)):
     y = org[1]
     for line in lines:
-        cv2.putText(img, line, (org[0], y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2, cv2.LINE_AA)
+        cv2.putText(img, line, (org[0], y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
         y += 28
+
 
 # =========================================
 # Modo por clics: manejo de mouse
@@ -106,6 +107,7 @@ class ClickCollector:
         if event == cv2.EVENT_LBUTTONDOWN:
             self.points.append((x, y))
 
+
 # =========================================
 # Modo QR: detección esquinas del QR
 # =========================================
@@ -123,6 +125,7 @@ def detect_qr_corners(frame, qrdetector):
     ordered = order_corners(pts)
     return ordered, data
 
+
 # =========================================
 # Loop principal
 # =========================================
@@ -136,9 +139,9 @@ def main():
     cv2.namedWindow(WINDOW_NAME_WARP, cv2.WINDOW_NORMAL)
 
     # Estado
-    mode = "view"          # "view" | "qr" | "click"
-    H = None               # homografía actual
-    last_qr_pts = None     # últimos puntos detectados en modo QR (para confirmar con cualquier tecla)
+    mode = "view"  # "view" | "qr" | "click"
+    H = None  # homografía actual
+    last_qr_pts = None  # últimos puntos detectados en modo QR (para confirmar con cualquier tecla)
     last_qr_data = None
     qrdetector = cv2.QRCodeDetector()
 
@@ -162,19 +165,18 @@ def main():
             if mode == "view":
                 # Visualización: si hay H, dibujar grilla y mostrar warp frontal
                 if H is not None:
-                    draw_perspective_grid(display, H, n=GRID_N, size=DEST_SIZE, color=(0,255,0), thickness=2)
+                    draw_perspective_grid(display, H, n=GRID_N, size=DEST_SIZE, color=(0, 255, 0), thickness=2)
                     warp = cv2.warpPerspective(frame, H, (DEST_SIZE, DEST_SIZE))
                     cv2.imshow(WINDOW_NAME_WARP, warp)
-                    put_status_text(display, ["[VIEW] Homografía activa (g = grilla, warp en ventana aparte)",
-                                              "Teclas: q=QR, h=clics, cierra para salir"])
+                    put_status_text(
+                        display, ["[VIEW] Homografía activa (g = grilla, warp en ventana aparte)", "Teclas: q=QR, h=clics, cierra para salir"]
+                    )
                 else:
                     # Sin homografía aún
                     blank = np.zeros((DEST_SIZE, DEST_SIZE, 3), dtype=np.uint8)
-                    cv2.putText(blank, "Sin homografia", (40, DEST_SIZE//2),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (200,200,200), 2, cv2.LINE_AA)
+                    cv2.putText(blank, "Sin homografia", (40, DEST_SIZE // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (200, 200, 200), 2, cv2.LINE_AA)
                     cv2.imshow(WINDOW_NAME_WARP, blank)
-                    put_status_text(display, ["[VIEW] Sin homografía",
-                                              "Teclas: q=QR, h=clics, cierra para salir"])
+                    put_status_text(display, ["[VIEW] Sin homografía", "Teclas: q=QR, h=clics, cierra para salir"])
 
             elif mode == "qr":
                 # Detección en vivo para que el usuario encuadre el QR
@@ -186,8 +188,9 @@ def main():
                     for p in pts.astype(int):
                         cv2.circle(display, tuple(p), 6, (0, 255, 255), -1)
                     cv2.polylines(display, [pts.astype(int)], True, (0, 255, 255), 2)
-                    put_status_text(display, ["[QR] QR detectado. Presiona cualquier tecla para confirmar.",
-                                              "q/h/otra tecla confirma con el QR actual."])
+                    put_status_text(
+                        display, ["[QR] QR detectado. Presiona cualquier tecla para confirmar.", "q/h/otra tecla confirma con el QR actual."]
+                    )
                 else:
                     put_status_text(display, ["[QR] Buscando QR...", "Presiona cualquier tecla para volver."])
 
@@ -195,12 +198,15 @@ def main():
                 # Mostrar puntos clickeados
                 for i, p in enumerate(clicker.points):
                     cv2.circle(display, p, 6, (255, 0, 255), -1)
-                    cv2.putText(display, f"{i+1}", (p[0]+8, p[1]-8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,255), 2)
+                    cv2.putText(display, f"{i+1}", (p[0] + 8, p[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
 
-                put_status_text(display, [
-                    "[CLICS] Hacé clic en 4 vértices de un cuadrado en perspectiva.",
-                    "Cualquier tecla antes del 4º clic: aborta (mantiene homografía previa)."
-                ])
+                put_status_text(
+                    display,
+                    [
+                        "[CLICS] Hacé clic en 4 vértices de un cuadrado en perspectiva.",
+                        "Cualquier tecla antes del 4º clic: aborta (mantiene homografía previa).",
+                    ],
+                )
 
                 if len(clicker.points) >= 4:
                     # Tomamos los primeros 4, ordenamos y computamos H
@@ -216,7 +222,7 @@ def main():
 
             # Mostrar mensajes breves, si hay
             if len(msg_queue) > 0:
-                put_status_text(display, list(msg_queue), org=(10, display.shape[0]-10-28*len(msg_queue)))
+                put_status_text(display, list(msg_queue), org=(10, display.shape[0] - 10 - 28 * len(msg_queue)))
 
             cv2.imshow(WINDOW_NAME_VIEW, display)
 
@@ -225,10 +231,10 @@ def main():
 
             if key != 255:  # alguna tecla
                 if mode == "view":
-                    if key == ord('q'):
+                    if key == ord("q"):
                         mode = "qr"
                         msg_queue.append("Modo QR: apunte a un código. Cualquier tecla confirma.")
-                    elif key == ord('h'):
+                    elif key == ord("h"):
                         mode = "click"
                         clicker.start()
                         msg_queue.append("Modo clics: seleccione 4 puntos o presione tecla para abortar.")
@@ -260,6 +266,7 @@ def main():
     finally:
         cap.release()
         cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
