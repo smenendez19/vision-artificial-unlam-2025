@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['black-king', 'black-pawn', 'white-knight', 'white-queen']
+
+roboflow:
+  workspace: smenendezworkspace
+  project: chess-detection-dnnpm
+  version: 2
+  license: MIT
+  url: https://universe.roboflow.com/smenendezworkspace/chess-detection-dnnpm/dataset/2

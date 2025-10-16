@@ -1,0 +1,6 @@
+chess_model/
+runs/
+dataset/images/
+
+yolov8n.pt
+yolo11n.pt
