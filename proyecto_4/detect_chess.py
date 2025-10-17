@@ -6,7 +6,7 @@ from ultralytics import YOLO
 # MODEL_PATH = "runs/chess_training/chess_v1/weights/best.pt"
 MODEL_PATH = "runs/chess_training/chess_v2/weights/best.pt"
 
-CONF_THRESHOLD = 0.15
+CONF_THRESHOLD = 0.25
 
 model = YOLO(MODEL_PATH)
 

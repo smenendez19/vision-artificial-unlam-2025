@@ -7,23 +7,23 @@ import torch
 from ultralytics import YOLO
 
 
-def main():
+def train_model(model, data, name):
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
     PROJECT_DIR = os.path.join(BASE_DIR, "runs", "chess_training")
 
     # Cargar modelo
-    model = YOLO("yolov8n.pt", "v8")
+    model = YOLO(model)
 
     # Entrenar
     model.train(
-        data="chess_model/data.yaml",
+        data=data,
         epochs=50,
         imgsz=640,
         device=0,
         batch=8,
         workers=4,
         project=PROJECT_DIR,
-        name="chess_v1",
+        name=name,
         exist_ok=True,
         verbose=True
     )
@@ -36,4 +36,7 @@ if __name__ == "__main__":
     print("CUDA Device:", torch.cuda.get_device_name(0))
 
     # Train model
-    main()
+    # train_model("yolov8n.pt", "chess_model/data.yaml", "chess_v1")
+
+    # Train model with best weights
+    train_model("runs/chess_training/chess_v1/weights/best.pt", "chess_model_new/data.yaml", "chess_v2")
