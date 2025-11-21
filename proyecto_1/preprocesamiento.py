@@ -1,15 +1,22 @@
+import os
+
 import cv2
-import numpy as np
 
-# Cargar imagen
-img = cv2.imread('vaso.jpg', cv2.IMREAD_GRAYSCALE)
+# Preprocesamiento de imagenes
 
-# Threshold más agresivo para limpiar fondo
-_, clean = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+image_path = "images"
 
-# Operaciones morfológicas para limpiar
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-clean = cv2.morphologyEx(clean, cv2.MORPH_CLOSE, kernel)
+for img_file in os.listdir(image_path):
 
-# Guardar template limpia
-cv2.imwrite('templates/vaso.png', clean)
+    # Monocromatica
+    img = cv2.imread(os.path.join(image_path, img_file), cv2.IMREAD_GRAYSCALE)
+
+    # Threshold
+    _, clean = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY_INV)
+
+    # Morfologia (Ruido)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    clean = cv2.morphologyEx(clean, cv2.MORPH_CLOSE, kernel)
+
+    img_template_file = img_file.split(".")[0] + ".png"
+    cv2.imwrite(f"templates/{img_template_file}", clean)

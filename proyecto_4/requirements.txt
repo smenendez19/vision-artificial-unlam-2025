@@ -1,0 +1,16 @@
+# YOLOv8 (Ultralytics)
+ultralytics>=8.0.0
+
+# OpenCV para procesar imágenes y video
+opencv-python>=4.7.0
+
+# PyTorch con soporte CUDA 12.1
+# NOTA: No se puede instalar directamente con pip desde PyPI, usar el index-url indicado abajo
+torch>=2.2.0
+torchvision>=0.17.0
+torchaudio>=2.2.0
+
+# Librerías opcionales útiles
+matplotlib>=3.7.0
+numpy>=1.25.0
+pandas>=2.1.0
