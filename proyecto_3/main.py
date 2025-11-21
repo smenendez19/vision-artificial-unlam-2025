@@ -127,7 +127,7 @@ def detect_qr_corners(frame, qrdetector):
 # Loop principal
 # =========================================
 def main():
-    cap = cv2.VideoCapture(0)  # importante: sin CAP_DSHOW en Linux
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) # importante: sin CAP_DSHOW en Linux
     if not cap.isOpened():
         print("No se pudo abrir la cámara. ¿Montaste /dev/video0 en el contenedor?")
         return
