@@ -1,5 +1,5 @@
 """
-Utilidades para el sistema de reconocimiento facial
+Utilidades para el sistema de reconocimiento facial - VERSIÓN CORREGIDA
 """
 import os
 import cv2
@@ -11,33 +11,38 @@ from config import Config
 def extraer_nombre_archivo(ruta_archivo):
     """
     Extrae el nombre limpio de una persona desde el nombre del archivo
-    Maneja casos con timestamps: Carlos_20251121_205414 -> Carlos
+    Maneja casos:
+    - Carlos_1.jpg -> Carlos
+    - Carlos_2.jpg -> Carlos
+    - Maria_Lopez_3.jpg -> Maria Lopez
+    - Carlos_20251121_205414.jpg -> Carlos
     
     Args:
         ruta_archivo (str): Ruta completa del archivo
     
     Returns:
-        str: Nombre de la persona sin timestamp
+        str: Nombre de la persona sin números/timestamps
     """
     # Obtener solo el nombre del archivo sin extensión
     nombre_archivo = os.path.splitext(os.path.basename(ruta_archivo))[0]
     
-    # NUEVO: Si el nombre contiene fechas/timestamps, extraer solo el nombre
+    # Dividir por guión bajo
     partes = nombre_archivo.split('_')
     
-    # Buscar la primera parte que NO sea un número (timestamp)
+    # Filtrar partes que sean solo números (eliminar índices y timestamps)
     nombre_limpio = []
     for parte in partes:
-        # Si es un número de 8 dígitos o más, probablemente es un timestamp
-        if parte.isdigit() and len(parte) >= 8:
-            break  # Detener aquí, lo que sigue es timestamp
+        # Si la parte es solo dígitos, omitirla (ya sea 1, 2, 3 o 20251121)
+        if parte.isdigit():
+            continue
+        # Agregar la parte al nombre
         nombre_limpio.append(parte)
     
     # Unir las partes del nombre
     if nombre_limpio:
         nombre = ' '.join(nombre_limpio).title()
     else:
-        # Fallback: usar solo la primera parte
+        # Fallback: usar solo la primera parte (por si acaso)
         nombre = partes[0].title()
     
     return nombre
@@ -195,6 +200,8 @@ def normalizar_nombre_archivo(nombre):
     nombre = ''.join(c for c in nombre if c in caracteres_validos)
     
     return nombre
+
+
 def dibujar_bbox(frame, bbox, nombre, rol, confianza, autorizado):
     """
     Dibuja un bounding box con información de la persona
@@ -304,26 +311,28 @@ def dibujar_bbox(frame, bbox, nombre, rol, confianza, autorizado):
 # ============================================
 # TESTING
 # ============================================
-# ... (el resto del código de testing que ya tienes)
-
-# ============================================
-# TESTING
-# ============================================
 
 if __name__ == "__main__":
-    print("🧪 Probando utilidades...\n")
+    print("🧪 Probando utilidades CORREGIDAS...\n")
     
-    # Test 1: Extraer nombre con timestamp
+    # Test: Extraer nombre con diferentes formatos
     rutas_test = [
-        'database/vip/Carlos_20251121_205414_531753.jpg',
-        'database/empleados/Maria_Lopez_20251121_120000.jpg',
-        'database/visitantes/Juan_20251121_153045.jpg',
-        'database/vip/carlos.jpg'
+        'database/vip/Carlos_1.jpg',
+        'database/vip/Carlos_2.jpg',
+        'database/empleados/Maria_Lopez_3.jpg',
+        'database/visitantes/Juan_10.jpg',
+        'database/vip/Carlos_20251121_205414.jpg',
+        'database/vip/carlos.jpg',
+        'database/empleados/Ana_Maria_Perez_5.jpg'
     ]
     
-    print("📝 Test: Extraer nombres")
+    print("📝 Test: Extraer nombres (todos deberían salir SIN números)")
+    print("=" * 70)
     for ruta in rutas_test:
         nombre = extraer_nombre_archivo(ruta)
-        print(f"  {os.path.basename(ruta)} → {nombre}")
+        print(f"  {os.path.basename(ruta):35} → {nombre}")
     
-    print("\n✓ Tests completados")
+    print("\n✅ Todos los nombres deberían aparecer sin números (1, 2, 3, etc.)")
+    print("   Carlos_1.jpg → Carlos")
+    print("   Carlos_2.jpg → Carlos")
+    print("   Maria_Lopez_3.jpg → Maria Lopez")
