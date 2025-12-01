@@ -195,7 +195,116 @@ def normalizar_nombre_archivo(nombre):
     nombre = ''.join(c for c in nombre if c in caracteres_validos)
     
     return nombre
+def dibujar_bbox(frame, bbox, nombre, rol, confianza, autorizado):
+    """
+    Dibuja un bounding box con información de la persona
+    
+    Args:
+        frame: Frame de OpenCV
+        bbox: Diccionario con {x, y, w, h}
+        nombre: Nombre de la persona
+        rol: Rol de la persona
+        confianza: Confianza del reconocimiento (0-100)
+        autorizado: Boolean si está autorizado
+    
+    Returns:
+        frame: Frame con el bbox dibujado
+    """
+    x, y, w, h = bbox['x'], bbox['y'], bbox['w'], bbox['h']
+    
+    # Color según autorización
+    if autorizado:
+        color = (0, 255, 0)  # Verde
+        color_fondo = (0, 200, 0)
+    else:
+        color = (0, 0, 255)  # Rojo
+        color_fondo = (0, 0, 200)
+    
+    # Dibujar rectángulo principal
+    cv2.rectangle(frame, (x, y), (x+w, y+h), color, 3)
+    
+    # Esquinas decorativas
+    longitud_esquina = 20
+    grosor_esquina = 4
+    # Esquina superior izquierda
+    cv2.line(frame, (x, y), (x + longitud_esquina, y), color, grosor_esquina)
+    cv2.line(frame, (x, y), (x, y + longitud_esquina), color, grosor_esquina)
+    # Esquina superior derecha
+    cv2.line(frame, (x+w, y), (x+w - longitud_esquina, y), color, grosor_esquina)
+    cv2.line(frame, (x+w, y), (x+w, y + longitud_esquina), color, grosor_esquina)
+    # Esquina inferior izquierda
+    cv2.line(frame, (x, y+h), (x + longitud_esquina, y+h), color, grosor_esquina)
+    cv2.line(frame, (x, y+h), (x, y+h - longitud_esquina), color, grosor_esquina)
+    # Esquina inferior derecha
+    cv2.line(frame, (x+w, y+h), (x+w - longitud_esquina, y+h), color, grosor_esquina)
+    cv2.line(frame, (x+w, y+h), (x+w, y+h - longitud_esquina), color, grosor_esquina)
+    
+    # Panel de información
+    texto_nombre = f"{nombre}"
+    texto_rol = f"{rol}"
+    texto_confianza = f"{confianza:.0f}%" if confianza > 0 else "N/A"
+    
+    # Calcular tamaño del panel
+    (w_texto, h_texto), _ = cv2.getTextSize(
+        texto_nombre, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
+    )
+    
+    # Fondo del panel
+    y_panel = y - 80
+    if y_panel < 0:
+        y_panel = y + h + 10
+    
+    cv2.rectangle(frame, 
+                 (x, y_panel), 
+                 (x + max(w_texto + 20, 200), y_panel + 75), 
+                 color_fondo, -1)
+    
+    # Borde del panel
+    cv2.rectangle(frame, 
+                 (x, y_panel), 
+                 (x + max(w_texto + 20, 200), y_panel + 75), 
+                 color, 2)
+    
+    # Textos del panel
+    cv2.putText(frame, texto_nombre, 
+               (x + 10, y_panel + 25),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    
+    cv2.putText(frame, texto_rol, 
+               (x + 10, y_panel + 50),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (230, 230, 230), 1)
+    
+    cv2.putText(frame, texto_confianza, 
+               (x + 10, y_panel + 70),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (230, 230, 230), 1)
+    
+    # Icono de estado
+    centro_icono = (x + w - 30, y + 30)
+    if autorizado:
+        # Check verde
+        cv2.circle(frame, centro_icono, 20, (0, 255, 0), -1)
+        cv2.putText(frame, "✓", 
+                   (centro_icono[0] - 10, centro_icono[1] + 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    else:
+        # X roja
+        cv2.circle(frame, centro_icono, 20, (0, 0, 255), -1)
+        cv2.line(frame, 
+                (centro_icono[0] - 10, centro_icono[1] - 10),
+                (centro_icono[0] + 10, centro_icono[1] + 10),
+                (255, 255, 255), 3)
+        cv2.line(frame, 
+                (centro_icono[0] + 10, centro_icono[1] - 10),
+                (centro_icono[0] - 10, centro_icono[1] + 10),
+                (255, 255, 255), 3)
+    
+    return frame
 
+
+# ============================================
+# TESTING
+# ============================================
+# ... (el resto del código de testing que ya tienes)
 
 # ============================================
 # TESTING
