@@ -392,7 +392,7 @@ class AplicacionFaceGuard:
                         frame = self.dibujar_detecciones(frame, resultado["detecciones"])
 
                     # Mostrar alerta si hay una reciente
-                    if ultima_alerta and frames_desde_alerta < 100:
+                    if ultima_alerta and frames_desde_alerta < 20:
                         self.mostrar_alerta(frame, ultima_alerta)
                         frames_desde_alerta += 1
 

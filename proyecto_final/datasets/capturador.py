@@ -121,7 +121,8 @@ class CapturadorDataset:
         input("Presiona ENTER para comenzar...")
 
         # Iniciar camara
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        #cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        cap = cv2.VideoCapture(0)
 
         if not cap.isOpened():
             print("Error: No se pudo abrir la camara")
@@ -137,6 +138,8 @@ class CapturadorDataset:
             if not ret:
                 print("Error capturando frame")
                 break
+
+            raw_frame = frame.copy()
 
             # Detectar rostros
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -201,7 +204,7 @@ class CapturadorDataset:
                 x_max = min(frame.shape[1], x + w + margen)
                 y_max = min(frame.shape[0], y + h + margen)
 
-                rostro = frame[y_min:y_max, x_min:x_max]
+                rostro = raw_frame[y_min:y_max, x_min:x_max]
 
                 # Guardar
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")

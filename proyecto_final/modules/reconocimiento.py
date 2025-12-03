@@ -109,7 +109,7 @@ class SistemaReconocimiento:
             camera_index = Config.CAMERA_INDEX
 
         try:
-            self.camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            self.camera = cv2.VideoCapture(0)
 
             if not self.camera.isOpened():
                 logger.error("No se pudo abrir la camara")
@@ -191,7 +191,39 @@ class SistemaReconocimiento:
             dict: Informacion de la persona identificada
         """
         try:
-            # Buscar en base de datos
+            from deepface import DeepFace
+
+            detecciones = DeepFace.extract_faces(
+                img_path=rostro_path,
+                detector_backend=self.detector_backend,
+                enforce_detection=False
+            )
+
+            if len(detecciones) == 0:
+                # Casi nunca pasa, pero lo dejo por robustez
+                cara_valida = False
+            else:
+                d = detecciones[0]
+                area = d["facial_area"]
+                conf = d.get("confidence", 0)
+
+                # Si el detector no encontró nada, estas señales lo delatan:
+                if conf == 0 or area["w"] == 0 or area["h"] == 0:
+                    cara_valida = False
+                else:
+                    cara_valida = True
+
+            if not cara_valida:
+                logger.info("No se detectaron caras reales en la imagen — no se genera alerta.")
+                return {
+                    "encontrado": False,
+                    "autorizado": False,
+                    "genera_alerta": False,
+                    "tipo_alerta": None,
+                    "nombre": "no_face_detected_or_no_match"
+                }
+
+            # 2) Si hay cara, usar la imagen completa o recortada
             resultados = DeepFace.find(
                 img_path=rostro_path,
                 db_path=self.db_path,
@@ -294,6 +326,8 @@ class SistemaReconocimiento:
 
                 # Identificar persona
                 info_persona = self.identificar_persona(rostro_img, rostro_temp)
+                if info_persona["nombre"] == "no_face_detected_or_no_match":
+                    continue
 
                 # Agregar informacion de ubicacion
                 deteccion = {
