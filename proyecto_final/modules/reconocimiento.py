@@ -268,8 +268,18 @@ class SistemaReconocimiento:
             else:
                 logger.warning("No se encontraron matches en la base de datos")
 
+            analysis = DeepFace.analyze(
+                img_path = rostro_path, actions = ['age', 'gender', 'race']
+            )
+            analysis_str = ""
+            if analysis is not None:
+                age = analysis[0]["age"]
+                gender = analysis[0]["dominant_gender"]
+                race = analysis[0]["dominant_race"]
+                analysis_str = info = f"Edad: {age}, Género: {gender}, Raza: {race}"
+
             # No se encontro o confianza baja
-            return self._persona_desconocida()
+            return self._persona_desconocida(analysis_str)
 
         except Exception as e:
             logger.error(f"Error identificando persona: {e}")
@@ -277,7 +287,7 @@ class SistemaReconocimiento:
             traceback.print_exc()
             return self._persona_desconocida()
 
-    def _persona_desconocida(self):
+    def _persona_desconocida(self, analysis = ""):
         """
         Retorna informacion de persona desconocida
 
@@ -293,6 +303,7 @@ class SistemaReconocimiento:
             "autorizado": False,
             "genera_alerta": True,
             "tipo_alerta": "critico",
+            "analysis": analysis
         }
 
     def procesar_frame(self, frame):
@@ -341,6 +352,7 @@ class SistemaReconocimiento:
                     "timestamp": datetime.now().isoformat(),
                     "genera_alerta": info_persona["genera_alerta"],
                     "tipo_alerta": info_persona.get("tipo_alerta"),
+                    "analysis": info_persona.get("analysis")
                 }
 
                 detecciones.append(deteccion)
