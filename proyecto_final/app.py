@@ -189,7 +189,7 @@ class AplicacionFaceGuard:
         cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
 
         # Titulo
-        cv2.putText(frame, "FACEGUARD - Sistema de Reconocimiento", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(frame, "FACEGUARD - Sistema de Reconocimiento - SECTOR A", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
         # Informacion
         info_textos = [
