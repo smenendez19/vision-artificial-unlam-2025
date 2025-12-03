@@ -271,7 +271,7 @@ class AplicacionFaceGuard:
         # Texto de alerta
         cv2.putText(frame, texto_nivel, (70, 180), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
 
-        cv2.putText(frame, f"Persona: {alerta['nombre']}", (70, 215), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(frame, f"Persona: {alerta['nombre']} {alerta["analysis"] if alerta["tipo_alerta"] == "critico" else ''}", (70, 215), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         cv2.putText(frame, f"Rol: {alerta['rol']}", (70, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
