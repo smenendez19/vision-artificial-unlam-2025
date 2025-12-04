@@ -8,12 +8,8 @@ import sys
 from datetime import datetime
 
 import cv2
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
 from config import Config
 from deepface import DeepFace
-from utils.file_utils import guardar_frame_temporal, limpiar_archivos_temporales
 from utils.helpers import (
     debe_generar_alerta,
     extraer_nombre_archivo,
@@ -21,6 +17,8 @@ from utils.helpers import (
     generar_id_deteccion,
     obtener_nivel_acceso,
 )
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 # Configurar logging
 logging.basicConfig(level=Config.LOG_LEVEL)
@@ -82,12 +80,7 @@ class SistemaReconocimiento:
                             # Nombre limpio de la persona
                             nombre = extraer_nombre_archivo(nombre_persona)
 
-                            roles[nombre] = {
-                                "rol": info["nombre"],
-                                "nivel_acceso": info["nivel_acceso"],
-                                "categoria": rol,
-                                "num_fotos": num_fotos
-                            }
+                            roles[nombre] = {"rol": info["nombre"], "nivel_acceso": info["nivel_acceso"], "categoria": rol, "num_fotos": num_fotos}
 
         logger.info(f"Cargados {len(roles)} perfiles")
         for nombre, info in roles.items():
@@ -165,27 +158,19 @@ class SistemaReconocimiento:
             list: Lista de rostros detectados
         """
         try:
-            # Guardar frame temporalmente
-            temp_path = guardar_frame_temporal(frame, "deteccion")
-
-            # Extraer rostros
-            rostros = DeepFace.extract_faces(img_path=temp_path, detector_backend=self.detector_backend, enforce_detection=False, align=True)
-
+            rostros = DeepFace.extract_faces(img_path=frame, detector_backend=self.detector_backend, enforce_detection=False, align=True)
             logger.debug(f"Detectados {len(rostros)} rostros")
-
             return rostros
-
         except Exception as e:
             logger.error(f"Error detectando rostros: {e}")
             return []
 
-    def identificar_persona(self, rostro_img, rostro_path):
+    def identificar_persona(self, rostro_img):
         """
         Identifica una persona comparando con la base de datos
 
         Args:
             rostro_img: Imagen del rostro
-            rostro_path (str): Ruta temporal del rostro
 
         Returns:
             dict: Informacion de la persona identificada
@@ -193,11 +178,7 @@ class SistemaReconocimiento:
         try:
             from deepface import DeepFace
 
-            detecciones = DeepFace.extract_faces(
-                img_path=rostro_path,
-                detector_backend=self.detector_backend,
-                enforce_detection=False
-            )
+            detecciones = DeepFace.extract_faces(img_path=rostro_img, detector_backend=self.detector_backend, enforce_detection=False)
 
             if len(detecciones) == 0:
                 # Casi nunca pasa, pero lo dejo por robustez
@@ -220,12 +201,12 @@ class SistemaReconocimiento:
                     "autorizado": False,
                     "genera_alerta": False,
                     "tipo_alerta": None,
-                    "nombre": "no_face_detected_or_no_match"
+                    "nombre": "no_face_detected_or_no_match",
                 }
 
             # 2) Si hay cara, usar la imagen completa o recortada
             resultados = DeepFace.find(
-                img_path=rostro_path,
+                img_path=rostro_img,
                 db_path=self.db_path,
                 model_name=self.model_name,
                 detector_backend=self.detector_backend,
@@ -268,15 +249,13 @@ class SistemaReconocimiento:
             else:
                 logger.warning("No se encontraron matches en la base de datos")
 
-            analysis = DeepFace.analyze(
-                img_path = rostro_path, actions = ['age', 'gender', 'race']
-            )
+            analysis = DeepFace.analyze(img_path=rostro_img, actions=["age", "gender", "race"])
             analysis_str = ""
             if analysis is not None:
                 age = analysis[0]["age"]
                 gender = analysis[0]["dominant_gender"]
                 race = analysis[0]["dominant_race"]
-                analysis_str = info = f"Edad: {age}, Genero: {gender}, Etnia: {race}"
+                analysis_str = f"Edad: {age}, Genero: {gender}, Etnia: {race}"
 
             # No se encontro o confianza baja
             return self._persona_desconocida(analysis_str)
@@ -284,10 +263,11 @@ class SistemaReconocimiento:
         except Exception as e:
             logger.error(f"Error identificando persona: {e}")
             import traceback
+
             traceback.print_exc()
             return self._persona_desconocida()
 
-    def _persona_desconocida(self, analysis = ""):
+    def _persona_desconocida(self, analysis=""):
         """
         Retorna informacion de persona desconocida
 
@@ -303,7 +283,7 @@ class SistemaReconocimiento:
             "autorizado": False,
             "genera_alerta": True,
             "tipo_alerta": "critico",
-            "analysis": analysis
+            "analysis": analysis,
         }
 
     def procesar_frame(self, frame):
@@ -329,14 +309,9 @@ class SistemaReconocimiento:
                 facial_area = rostro["facial_area"]
                 x, y, w, h = facial_area["x"], facial_area["y"], facial_area["w"], facial_area["h"]
 
-                # Extraer region del rostro del frame original
                 rostro_img = frame[y: y + h, x: x + w]
 
-                # Guardar temporalmente
-                rostro_temp = guardar_frame_temporal(rostro_img, f"rostro_{i}")
-
-                # Identificar persona
-                info_persona = self.identificar_persona(rostro_img, rostro_temp)
+                info_persona = self.identificar_persona(rostro_img)
                 if info_persona["nombre"] == "no_face_detected_or_no_match":
                     continue
 
@@ -352,7 +327,8 @@ class SistemaReconocimiento:
                     "timestamp": datetime.now().isoformat(),
                     "genera_alerta": info_persona["genera_alerta"],
                     "tipo_alerta": info_persona.get("tipo_alerta"),
-                    "analysis": info_persona.get("analysis")
+                    "analysis": info_persona.get("analysis"),
+                    "rostro_img": rostro_img
                 }
 
                 detecciones.append(deteccion)
@@ -363,10 +339,6 @@ class SistemaReconocimiento:
 
             except Exception as e:
                 logger.error(f"Error procesando rostro {i}: {e}")
-
-        # Limpiar archivos temporales antiguos
-        if self.total_detecciones % 100 == 0:
-            limpiar_archivos_temporales()
 
         return {"detecciones": detecciones, "total_detectados": len(detecciones), "timestamp": datetime.now().isoformat()}
 

@@ -1,18 +1,10 @@
 """
 FACEGUARD - Sistema de Reconocimiento Facial
-Aplicacion principal con menu interactivo
-
-Mejoras implementadas:
-- Menu principal con navegacion por flechas arriba/abajo
-- Menu visual en OpenCV para seleccion de categoria (sin input de terminal)
-- Reconocimiento mejorado: multiples fotos de la misma persona se identifican correctamente
-- Carpeta backend limpiada: solo contiene database/, logs/ y temp/
-- Config.py movido a raiz del proyecto
-- Deteccion robusta de teclas con codigos completos (sin mascara 0xFF en flechas)
 """
 
 import os
 import sys
+import threading
 from datetime import datetime
 
 import cv2
@@ -20,6 +12,7 @@ import numpy as np
 from config import Config
 from datasets.capturador import CapturadorDataset
 from modules.reconocimiento import SistemaReconocimiento
+from utils.alert_logger import AlertLogger
 from utils.draw_utils import (
     dibujar_bbox,
     dibujar_menu_seleccion,
@@ -36,18 +29,23 @@ class AplicacionFaceGuard:
     """
 
     def __init__(self):
-        """Inicializar aplicacion"""
         print("\n" + "=" * 70)
         print("FACEGUARD - Sistema de Reconocimiento Facial")
         print("=" * 70 + "\n")
 
-        # Inicializar configuracion
         Config.init_app()
 
-        # Estadisticas de sesion
         self.frame_count = 0
         self.detecciones_sesion = []
         self.alertas_sesion = []
+        self.alert_logger = AlertLogger()
+        self.desconocidos_guardados = set()
+
+        self.processing_thread = None
+        self.thread_activo = False
+        self.frame_a_procesar = None
+        self.resultado_listo = None
+        self.lock = threading.Lock()
 
     def mostrar_menu_principal(self):
         """
@@ -59,12 +57,7 @@ class AplicacionFaceGuard:
         # Crear frame negro para el menu
         frame = np.ones((720, 1280, 3), dtype="uint8") * 255
 
-        opciones = [
-            "Capturar nuevo dataset de persona",
-            "Entrenar modelo de reconocimiento",
-            "Reconocimiento facial en tiempo real",
-            "Salir"
-        ]
+        opciones = ["Capturar nuevo dataset de persona", "Entrenar modelo de reconocimiento", "Reconocimiento facial en tiempo real", "Salir"]
 
         seleccion = 0
 
@@ -271,16 +264,32 @@ class AplicacionFaceGuard:
         # Texto de alerta
         cv2.putText(frame, texto_nivel, (70, 180), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
 
-        cv2.putText(frame, f"Persona: {alerta['nombre']} {alerta["analysis"] if alerta["tipo_alerta"] == "critico" else ''}", (70, 215), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        analysis_text = alerta["analysis"] if alerta["tipo_alerta"] == "critico" else ""
+        persona_text = f"Persona: {alerta['nombre']} {analysis_text}"
+        cv2.putText(frame, persona_text, (70, 215), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         cv2.putText(frame, f"Rol: {alerta['rol']}", (70, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-    def guardar_screenshot(self, frame):
-        """Guarda un screenshot del frame actual"""
+    def guardar_screenshot(self, deteccion):
+        if deteccion.get("nombre") == "Desconocido":
+            det_id = f"{deteccion['bbox']['x']}_{deteccion['bbox']['y']}_{self.frame_count}"
+
+            if det_id not in self.desconocidos_guardados:
+                self.desconocidos_guardados.add(det_id)
+
+                rostro_img = deteccion.get("rostro_img")
+                if rostro_img is not None:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    filename = os.path.join(Config.TEMP_DIR, f"desconocido_{timestamp}.jpg")
+                    cv2.imwrite(filename, rostro_img)
+                    print(f"Rostro desconocido guardado: {filename}")
+
+    def guardar_screenshot_manual(self, frame):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"screenshot_{timestamp}.jpg"
+        filename = os.path.join(Config.TEMP_DIR, f"screenshot_{timestamp}.jpg")
         cv2.imwrite(filename, frame)
-        print(f"Screenshot guardado: {filename}")
+        print(f"\nScreenshot guardado: {filename}")
+        return filename
 
     def mostrar_estadisticas_finales(self, sistema):
         """Muestra estadisticas al finalizar"""
@@ -310,15 +319,31 @@ class AplicacionFaceGuard:
 
         print("\n" + "=" * 70)
 
+    def procesamiento_thread_worker(self, sistema):
+        while self.thread_activo:
+            with self.lock:
+                frame_data = self.frame_a_procesar
+                self.frame_a_procesar = None
+
+            if frame_data is not None:
+                frame_num, frame = frame_data
+                resultado = sistema.procesar_frame(frame)
+
+                with self.lock:
+                    self.resultado_listo = (frame_num, resultado)
+            else:
+                threading.Event().wait(0.01)
+
     def reconocimiento_tiempo_real(self):
-        """
-        Ejecuta el reconocimiento facial en tiempo real
-        """
         print("\n" + "=" * 70)
         print("RECONOCIMIENTO FACIAL EN TIEMPO REAL")
         print("=" * 70 + "\n")
 
-        # Inicializar sistema
+        if self.thread_activo:
+            print("Ya hay una sesión de reconocimiento activa")
+            input("\nPresiona ENTER para volver al menu principal...")
+            return
+
         sistema = SistemaReconocimiento()
 
         print("Sistema inicializado correctamente")
@@ -326,7 +351,6 @@ class AplicacionFaceGuard:
         print(f"Modelo: {sistema.model_name}")
         print(f"Detector: {sistema.detector_backend}\n")
 
-        # Iniciar camara
         if not sistema.iniciar_camara():
             print("Error: No se pudo iniciar la camara")
             input("\nPresiona ENTER para volver al menu principal...")
@@ -337,78 +361,93 @@ class AplicacionFaceGuard:
         print("  - Q: Salir")
         print("  - ESPACIO: Pausar/Reanudar")
         print("  - R: Reiniciar estadisticas")
-        print("  - S: Capturar screenshot")
         print("\nIniciando deteccion...\n")
 
-        # Reiniciar contadores
         self.frame_count = 0
         self.detecciones_sesion = []
         self.alertas_sesion = []
+        self.desconocidos_guardados.clear()
+
+        self.thread_activo = True
+        self.frame_a_procesar = None
+        self.resultado_listo = None
+
+        self.processing_thread = threading.Thread(target=self.procesamiento_thread_worker, args=(sistema,), daemon=True)
+        self.processing_thread.start()
+
+        self.alert_logger.log_sesion_inicio()
 
         pausado = False
         ultima_alerta = None
         frames_desde_alerta = 0
+        ultimo_frame_procesado = -1
+        detecciones_actuales = []
 
         try:
             while True:
                 if not pausado:
-                    # Capturar frame
                     frame = sistema.capturar_frame()
 
                     if frame is None:
                         print("Error capturando frame")
                         break
 
-                    # Procesar cada N frames
                     if self.frame_count % Config.PROCESAR_CADA_N_FRAMES == 0:
-                        resultado = sistema.procesar_frame(frame)
+                        with self.lock:
+                            if self.frame_a_procesar is None:
+                                self.frame_a_procesar = (self.frame_count, frame.copy())
 
-                        # Guardar detecciones
-                        if resultado["detecciones"]:
-                            self.detecciones_sesion.extend(resultado["detecciones"])
+                    with self.lock:
+                        if self.resultado_listo is not None:
+                            frame_num, resultado = self.resultado_listo
+                            self.resultado_listo = None
 
-                            # Log en consola
-                            print(f"\nFrame {self.frame_count}:")
-                            for det in resultado["detecciones"]:
-                                icono = "OK" if det["autorizado"] else "ALERTA"
-                                print(f"  [{icono}] {det['nombre']} - {det['rol']} ({det['confianza']}%)")
+                            if frame_num > ultimo_frame_procesado:
+                                ultimo_frame_procesado = frame_num
+                                detecciones_actuales = resultado["detecciones"]
 
-                            # Generar alertas
-                            for det in resultado["detecciones"]:
-                                if det["genera_alerta"]:
-                                    ultima_alerta = det
-                                    frames_desde_alerta = 0
-                                    self.alertas_sesion.append(
-                                        {
-                                            "timestamp": datetime.now().strftime("%H:%M:%S"),
-                                            "nombre": det["nombre"],
-                                            "rol": det["rol"],
-                                            "tipo_alerta": det["tipo_alerta"],
-                                        }
-                                    )
-                                    print(f"\n  ALERTA: {det['nombre']} - {det['tipo_alerta']}")
+                                if detecciones_actuales:
+                                    self.detecciones_sesion.extend(detecciones_actuales)
 
-                        # Dibujar detecciones
-                        frame = self.dibujar_detecciones(frame, resultado["detecciones"])
+                                    print(f"\nFrame {frame_num}:")
+                                    for det in detecciones_actuales:
+                                        icono = "OK" if det["autorizado"] else "ALERTA"
+                                        print(f"  [{icono}] {det['nombre']} - {det['rol']} ({det['confianza']}%)")
 
-                    # Mostrar alerta si hay una reciente
-                    if ultima_alerta and frames_desde_alerta < 20:
+                                        if det["autorizado"]:
+                                            self.alert_logger.log_deteccion(det)
+                                        elif det["nombre"] == "Desconocido":
+                                            self.guardar_screenshot(det)
+
+                                    for det in detecciones_actuales:
+                                        if det["genera_alerta"]:
+                                            ultima_alerta = det
+                                            frames_desde_alerta = 0
+
+                                            alerta_info = {
+                                                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                                                "nombre": det["nombre"],
+                                                "rol": det["rol"],
+                                                "tipo_alerta": det["tipo_alerta"],
+                                            }
+                                            self.alertas_sesion.append(alerta_info)
+                                            self.alert_logger.log_alerta(det)
+                                            print(f"\n  ALERTA: {det['nombre']} - {det['tipo_alerta']}")
+
+                    frame = self.dibujar_detecciones(frame, detecciones_actuales)
+
+                    if ultima_alerta and frames_desde_alerta < 60:
                         self.mostrar_alerta(frame, ultima_alerta)
                         frames_desde_alerta += 1
 
-                    # Informacion en pantalla
                     frame = self.mostrar_info_pantalla(frame, sistema)
-
                     self.frame_count += 1
 
                 else:
-                    # Mensaje de pausa
                     frame = mostrar_mensaje_centro(frame, "PAUSADO - Presiona ESPACIO para continuar", (255, 255, 0))
 
-                # Mostrar frame
                 cv2.imshow("FaceGuard - Reconocimiento Facial", frame)
 
-                # Controles de teclado
                 key = cv2.waitKey(1) & 0xFF
 
                 if key == ord("q") or key == ord("Q"):
@@ -418,25 +457,39 @@ class AplicacionFaceGuard:
                     pausado = not pausado
                     estado = "PAUSADO" if pausado else "REANUDADO"
                     print(f"\n{estado}")
+                elif key == ord("s") or key == ord("S"):
+                    self.guardar_screenshot_manual(frame)
                 elif key == ord("r") or key == ord("R"):
                     self.detecciones_sesion = []
                     self.alertas_sesion = []
                     self.frame_count = 0
+                    detecciones_actuales = []
+                    ultima_alerta = None
+                    frames_desde_alerta = 0
+                    ultimo_frame_procesado = -1
+                    self.desconocidos_guardados.clear()
                     print("\nEstadisticas reiniciadas")
-                elif key == ord("s") or key == ord("S"):
-                    self.guardar_screenshot(frame)
 
         except KeyboardInterrupt:
             print("\n\nPrograma interrumpido por el usuario")
 
         finally:
-            # Limpiar
+            self.thread_activo = False
+
+            if self.processing_thread and self.processing_thread.is_alive():
+                self.processing_thread.join(timeout=2.0)
+
+            self.alert_logger.log_sesion_fin(
+                {
+                    "frames_procesados": self.frame_count,
+                    "total_detecciones": len(self.detecciones_sesion),
+                    "alertas_generadas": len(self.alertas_sesion),
+                }
+            )
+
             sistema.detener_camara()
             cv2.destroyAllWindows()
-
-            # Mostrar estadisticas finales
             self.mostrar_estadisticas_finales(sistema)
-
             print("\nSistema detenido correctamente")
             input("\nPresiona ENTER para volver al menu principal...")
 
@@ -504,11 +557,7 @@ class AplicacionFaceGuard:
                     continue
 
                 print(f"\nProcesando categoria: {categoria.upper()}")
-                personas = [
-                    p
-                    for p in os.listdir(ruta_categoria)
-                    if os.path.isdir(os.path.join(ruta_categoria, p))
-                ]
+                personas = [p for p in os.listdir(ruta_categoria) if os.path.isdir(os.path.join(ruta_categoria, p))]
 
                 for persona in personas:
                     ruta_persona = os.path.join(ruta_categoria, persona)

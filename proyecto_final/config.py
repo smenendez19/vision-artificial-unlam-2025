@@ -27,7 +27,7 @@ class Config:
 
     # Procesamiento
     PROCESAR_CADA_N_FRAMES = 10
-    MAX_DETECCIONES = 4
+    MAX_DETECCIONES = 1
 
     # Categorias y Roles
     ROLES = {

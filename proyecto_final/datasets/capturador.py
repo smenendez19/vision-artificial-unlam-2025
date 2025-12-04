@@ -121,7 +121,7 @@ class CapturadorDataset:
         input("Presiona ENTER para comenzar...")
 
         # Iniciar camara
-        #cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        # cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         cap = cv2.VideoCapture(0)
 
         if not cap.isOpened():
