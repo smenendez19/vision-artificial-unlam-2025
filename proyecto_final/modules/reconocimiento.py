@@ -276,7 +276,7 @@ class SistemaReconocimiento:
                 age = analysis[0]["age"]
                 gender = analysis[0]["dominant_gender"]
                 race = analysis[0]["dominant_race"]
-                analysis_str = info = f"Edad: {age}, Género: {gender}, Raza: {race}"
+                analysis_str = info = f"Edad: {age}, Genero: {gender}, Etnia: {race}"
 
             # No se encontro o confianza baja
             return self._persona_desconocida(analysis_str)
